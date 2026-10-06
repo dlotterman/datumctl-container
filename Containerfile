@@ -75,5 +75,10 @@ RUN set -eux; \
     test -x "${plugins}/datum-connect"; \
     datumctl plugin list
 
+# `datumctl compute build` talks to BuildKit directly (no docker CLI needed).
+# Default to a sidecar container named "buildkitd" on a shared network; override
+# with `-e BUILDKIT_HOST=...` to point elsewhere.
+ENV BUILDKIT_HOST=tcp://buildkitd:1234
+
 ENTRYPOINT ["/usr/local/bin/datumctl"]
 CMD ["--help"]

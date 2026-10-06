@@ -73,6 +73,25 @@ Login state is stored in `/root/.datumctl`. It is lost when a `--rm` container e
 podman run -it --rm -v datumctl-config:/root/.datumctl --entrypoint /bin/bash localhost/datumctl:latest
 ```
 
+### Build unikernel images with `datumctl compute build`
+
+[`datumctl compute build`](https://www.datum.net/docs/compute/unikernels) needs a BuildKit server. The image has no Docker CLI or daemon; it connects straight to BuildKit using `BUILDKIT_HOST` (default `tcp://buildkitd:1234`). Run BuildKit in a separate container on a shared network:
+
+```sh
+podman network create datum-build
+podman run -d --name buildkitd --network datum-build --privileged \
+  docker.io/moby/buildkit:latest --addr tcp://0.0.0.0:1234
+```
+
+Then run the build from a directory containing your `Dockerfile` (or `Dockerfile.datum`):
+
+```sh
+podman run --rm --network datum-build -v "$PWD":/work:Z -w /work \
+  localhost/datumctl:latest compute build .
+```
+
+Add `--output ./image.tar` to write an OCI archive, or `--push --output <registry/ref>` to publish (the Datum docs say to run `docker login` first; registry pushing is untested here). Override the server with `-e BUILDKIT_HOST=...`. BuildKit needs `--privileged`; when finished, remove it with `podman rm -f buildkitd && podman network rm datum-build`.
+
 ### Bind-mount your `.datumctl` folder
 
 To share credentials and config with the host (or between containers), bind-mount a host directory onto `/root/.datumctl`:
