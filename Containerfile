@@ -47,8 +47,19 @@ RUN set -eux; \
 # template name ("datum-connect{{ if eq .Os "windows" }}.exe{{ end }}") without the
 # exec bit, and `plugin install` only places the Go wrapper. Install it by hand
 # when it is missing; this is a no-op once the release is fixed.
+#
+# Upstream only publishes prereleases (e.g. v1.0.0-preview.N), which GitHub's
+# /releases/latest and `plugin install datum-cloud/connect` both ignore. Resolve
+# the newest release, prereleases included, from the public releases feed. The
+# feed can list a tag before its assets are uploaded, so take the newest tag
+# that already has a checksums.txt.
 RUN set -eux; \
-    datumctl plugin install datum-cloud/connect; \
+    tag=; \
+    for t in $(curl -fsSL https://github.com/datum-cloud/connect/releases.atom | grep -oE 'releases/tag/[^"]+' | sed 's|.*/||'); do \
+      if curl -fsSIL -o /dev/null "https://github.com/datum-cloud/connect/releases/download/${t}/checksums.txt"; then tag="$t"; break; fi; \
+    done; \
+    test -n "$tag"; \
+    datumctl plugin install "datum-cloud/connect@${tag}"; \
     plugins="${HOME}/.datumctl/plugins"; \
     if [ ! -x "${plugins}/datum-connect" ]; then \
       case "$(dpkg --print-architecture)" in \
@@ -56,8 +67,6 @@ RUN set -eux; \
         arm64) arch=arm64 ;; \
         *) echo "unsupported architecture for datum-connect: $(dpkg --print-architecture)" >&2; exit 1 ;; \
       esac; \
-      tag="$(curl -fsSLo /dev/null -w '%{url_effective}' https://github.com/datum-cloud/connect/releases/latest)"; \
-      tag="${tag##*/}"; \
       base="https://github.com/datum-cloud/connect/releases/download/${tag}"; \
       tarball="datumctl-connect_Linux_${arch}.tar.gz"; \
       tmp="$(mktemp -d)"; \

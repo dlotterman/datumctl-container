@@ -35,9 +35,12 @@ jobs:
         run: |
           set -euo pipefail
           # Uses /releases/latest, the same lookup `datumctl plugin install` relies on.
+          # Repos that only publish prereleases (e.g. datum-cloud/connect) have no
+          # "latest", so fall back to the newest release of any kind.
           : > versions.txt
           for repo in ${TRACKED_REPOS}; do
-            tag="$(gh api "repos/${repo}/releases/latest" -q .tag_name)"
+            tag="$(gh api "repos/${repo}/releases/latest" -q .tag_name 2>/dev/null \
+              || gh api "repos/${repo}/releases?per_page=1" -q '.[0].tag_name')"
             echo "${repo}=${tag}" | tee -a versions.txt
           done
           datumctl_tag="$(sed -n 's|^datum-cloud/datumctl=||p' versions.txt)"
