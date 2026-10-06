@@ -35,17 +35,26 @@ podman run -it --rm --entrypoint /bin/bash docker.io/dlotterman/datumctl-contain
 
 ## Logging in
 
-There's no browser in the container, so log in with:
+Login state lives in `/root/.datumctl` inside the container. Every `podman run` starts a new container, so without a volume you'll be asked to log in again each time (`error: No active user found`).
 
-```sh
-datumctl login --no-browser
-```
-
-Login state lives in `/root/.datumctl` and disappears when a `--rm` container exits. To keep it, use a named volume:
+Mount a named volume on every run to keep your login. There's no browser in the container, so log in once with `--no-browser`:
 
 ```sh
 podman run -it --rm -v datumctl-config:/root/.datumctl \
-  --entrypoint /bin/bash docker.io/dlotterman/datumctl-container:latest
+  docker.io/dlotterman/datumctl-container:latest login --no-browser
+```
+
+Then use the same volume for everything else:
+
+```sh
+podman run -it --rm -v datumctl-config:/root/.datumctl \
+  docker.io/dlotterman/datumctl-container:latest get dnszones
+```
+
+Tip: an alias saves typing.
+
+```sh
+alias datumctl='podman run -it --rm -v datumctl-config:/root/.datumctl docker.io/dlotterman/datumctl-container:latest'
 ```
 
 ### Sharing your host's login
@@ -58,7 +67,7 @@ touch ~/.datumctl/config ~/.datumctl/credentials.json
 podman run -it --rm \
   -v ~/.datumctl/config:/root/.datumctl/config:Z \
   -v ~/.datumctl/credentials.json:/root/.datumctl/credentials.json:Z \
-  --entrypoint /bin/bash docker.io/dlotterman/datumctl-container:latest
+  docker.io/dlotterman/datumctl-container:latest get dnszones
 ```
 
 - Create the files first, or Podman will make them directories.
