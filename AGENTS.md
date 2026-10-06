@@ -6,6 +6,7 @@ Container image that bundles `datumctl` and the Datum Cloud plugins (`alb`, `ass
 
 - `Containerfile`: the whole image definition. Based on unpinned `ubuntu:latest`, installs the latest `datumctl` release (checksum-verified), then the plugins.
 - `.github/workflows/build.yml`: hourly job that rebuilds and pushes `dlotterman/datumctl-container` when a tracked upstream release changes.
+- `.github/workflows/ci.yml`: on every push and PR, builds the image (amd64 and arm64, no push) and checks that all 7 plugins are listed.
 - `README.md`: build and usage steps for humans.
 - `.env`: local secrets, git-ignored. Never read, print, or commit it.
 

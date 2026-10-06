@@ -1,0 +1,45 @@
+name: ci
+
+# Validates that the Containerfile builds and the image works. Never pushes.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          # Plugins are installed unpinned, so never reuse a cached layer.
+          no-cache: true
+          tags: datumctl:ci
+
+      - name: Check datumctl and plugins
+        run: |
+          set -euo pipefail
+          docker run --rm --platform "${{ matrix.platform }}" datumctl:ci version
+          out="$(docker run --rm --platform "${{ matrix.platform }}" datumctl:ci plugin list)"
+          echo "${out}"
+          for plugin in alb assistant compute connect dns ipam search; do
+            echo "${out}" | grep -qw "${plugin}" || { echo "missing plugin: ${plugin}" >&2; exit 1; }
+          done
