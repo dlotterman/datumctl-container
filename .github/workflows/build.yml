@@ -1,0 +1,98 @@
+name: build
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if this combination of releases already exists on Docker Hub"
+        type: boolean
+        default: false
+
+env:
+  IMAGE: dlotterman/datumctl-container
+  # Repos whose latest release should trigger a rebuild when it changes.
+  TRACKED_REPOS: >-
+    datum-cloud/datumctl
+    datum-cloud/connect
+    datum-cloud/network-services-operator
+    datum-cloud/compute
+    datum-cloud/dns-operator
+    datum-cloud/inventory
+    milo-os/assistant
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Find latest releases
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Uses /releases/latest, the same lookup `datumctl plugin install` relies on.
+          : > versions.txt
+          for repo in ${TRACKED_REPOS}; do
+            tag="$(gh api "repos/${repo}/releases/latest" -q .tag_name)"
+            echo "${repo}=${tag}" | tee -a versions.txt
+          done
+          datumctl_tag="$(sed -n 's|^datum-cloud/datumctl=||p' versions.txt)"
+          # Short fingerprint of every tracked release; changes when any one does.
+          hash="$(sort versions.txt | sha256sum | cut -c1-8)"
+          {
+            echo "datumctl=${datumctl_tag}"
+            echo "key=${datumctl_tag}-${hash}"
+            echo "labels<<EOF"
+            while IFS='=' read -r repo tag; do
+              echo "net.datum.release.${repo//\//.}=${tag}"
+            done < versions.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this combination is already published
+        id: check
+        run: |
+          ref="docker.io/${IMAGE}:${{ steps.release.outputs.key }}"
+          if [ "${{ inputs.force }}" != "true" ] && docker manifest inspect "${ref}" >/dev/null 2>&1; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "${ref} already exists; nothing to do."
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.build == 'true'
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.check.outputs.build == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.check.outputs.build == 'true'
+
+      - uses: docker/login-action@v3
+        if: steps.check.outputs.build == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        if: steps.check.outputs.build == 'true'
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # Plugins are installed unpinned, so never reuse a cached layer.
+          no-cache: true
+          build-args: |
+            DATUMCTL_VERSION=${{ steps.release.outputs.datumctl }}
+          labels: |
+            ${{ steps.release.outputs.labels }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.release.outputs.key }}
+            ${{ env.IMAGE }}:${{ steps.release.outputs.datumctl }}
+            ${{ env.IMAGE }}:latest
