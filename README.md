@@ -1,5 +1,8 @@
 # datumctl-container
 
+[![ci](https://github.com/dlotterman/datumctl-container/actions/workflows/ci.yml/badge.svg)](https://github.com/dlotterman/datumctl-container/actions/workflows/ci.yml)
+[![build](https://github.com/dlotterman/datumctl-container/actions/workflows/build.yml/badge.svg)](https://github.com/dlotterman/datumctl-container/actions/workflows/build.yml)
+
 A container image with [`datumctl`](https://github.com/datum-cloud/datumctl) and the Datum Cloud plugins preinstalled:
 `alb`, `assistant`, `compute`, `dns`, `ipam`, `search`, and `connect` (Datum Connect tunnels).
 
