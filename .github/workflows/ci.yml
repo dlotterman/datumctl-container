@@ -31,7 +31,7 @@ jobs:
       - name: Check datumctl and plugins
         run: |
           set -euo pipefail
-          docker run --rm datumctl:ci version
+          docker run --rm datumctl:ci version --client
           out="$(docker run --rm datumctl:ci plugin list)"
           echo "${out}"
           for plugin in alb assistant compute connect dns ipam search; do

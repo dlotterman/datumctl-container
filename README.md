@@ -28,7 +28,7 @@ You need [Podman](https://podman.io/) (Docker works too; swap `podman` for `dock
 3. Check that it worked:
 
    ```sh
-   podman run --rm localhost/datumctl:latest version
+   podman run --rm localhost/datumctl:latest version --client
    podman run --rm localhost/datumctl:latest plugin list
    ```
 
