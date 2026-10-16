@@ -11,55 +11,49 @@ Examples use [Podman](https://podman.io/). Docker works the same; just swap the 
 
 ## Quick start
 
-Pull the image and check it:
-
 ```sh
 podman pull docker.io/dlotterman/datumctl-container:latest
-podman run --rm docker.io/dlotterman/datumctl-container:latest version --client
-podman run --rm docker.io/dlotterman/datumctl-container:latest plugin list
+podman run --rm docker.io/dlotterman/datumctl-container:latest plugin list   # expect all 7 plugins
 ```
 
-You should see all seven plugins.
-
-The entrypoint is `datumctl`, so arguments go straight to it:
-
-```sh
-podman run --rm docker.io/dlotterman/datumctl-container:latest --help
-```
-
-For a shell instead:
+The entrypoint is `datumctl`, so arguments go straight to it. For a shell instead:
 
 ```sh
 podman run -it --rm --entrypoint /bin/bash docker.io/dlotterman/datumctl-container:latest
 ```
 
+## Updating
+
+The image is rebuilt whenever upstream releases change, but Podman never re-pulls on its own. To refresh:
+
+```sh
+podman pull docker.io/dlotterman/datumctl-container:latest
+podman image prune -f   # optional: remove the old, now untagged image
+```
+
+Check what you have with `podman run --rm docker.io/dlotterman/datumctl-container:latest version --client`. Your login lives in a volume, so it survives updates.
+
 ## Logging in
 
-Login state lives in `/root/.datumctl` inside the container. Every `podman run` starts a new container, so without a volume you'll be asked to log in again each time (`error: No active user found`).
+Login state lives in `/root/.datumctl` inside the container. Each `podman run` is a fresh container, so mount a named volume to keep your login (otherwise: `error: No active user found`).
 
-Mount a named volume on every run to keep your login. There's no browser in the container, so log in once with `--no-browser`:
+There's no browser in the container, so log in once with `--no-browser`:
 
 ```sh
 podman run -it --rm -v datumctl-config:/root/.datumctl \
   docker.io/dlotterman/datumctl-container:latest login --no-browser
 ```
 
-Then use the same volume for everything else:
-
-```sh
-podman run -it --rm -v datumctl-config:/root/.datumctl \
-  docker.io/dlotterman/datumctl-container:latest get dnszones
-```
-
-Tip: an alias saves typing.
+Then use the same volume for everything else. An alias saves typing:
 
 ```sh
 alias datumctl='podman run -it --rm -v datumctl-config:/root/.datumctl docker.io/dlotterman/datumctl-container:latest'
+datumctl get dnszones
 ```
 
 ### Sharing your host's login
 
-To reuse the credentials from your host, mount just the two files. Mounting the whole folder would hide the plugins that ship in the image.
+To reuse your host's credentials instead, mount just the two files (mounting the whole folder would hide the plugins in the image):
 
 ```sh
 mkdir -p ~/.datumctl
